@@ -103,7 +103,7 @@ def _(ann_df, datetime):
 
     ann_df["FlightDate"] = ann_df["FlightDate"].map(to_integer)
     ann_df
-    print(ann_df)
+    #print(ann_df)
     return
 
 
@@ -145,11 +145,12 @@ def _(
 
 @app.cell
 def _(ann_model, plt, sns):
-    sns.lineplot(x=range(len(ann_model.loss_curve_)), y=ann_model.loss_curve_)
+    plotted = sns.lineplot(x=range(len(ann_model.loss_curve_)), y=ann_model.loss_curve_)
     plt.title('Loss Curve')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.show()
+    plotted
     return
 
 
@@ -252,16 +253,19 @@ def _(DecisionTreeClassifier, trainX_CART, trainY_CART, testX_CART):
     return target_pred_CART, model_CART
 
 @app.cell
-def _(confusion_matrix, classification_report, testY_CART, target_pred_CART):
+def _(confusion_matrix, classification_report, testY_CART, target_pred_CART, mo):
     print(confusion_matrix(testY_CART,target_pred_CART))
+    mo.md(f"{confusion_matrix(testY_CART,target_pred_CART)}")
     print(classification_report(testY_CART,target_pred_CART))
+    mo.md(f"{classification_report(testY_CART,target_pred_CART)}")
     return 
 
 @app.cell
 def _(plt, plot_tree, model_CART, ann_df):
     plt.figure(figsize=(20,10), dpi=100)
-    plot_tree(model_CART,fontsize=20,filled=True,feature_names=ann_df.columns);
+    tree_res = plot_tree(model_CART,fontsize=20,filled=True,feature_names=ann_df.columns);
     plt.show()
+    tree_res
 
 @app.cell
 def _(mo):
