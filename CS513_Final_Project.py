@@ -157,7 +157,12 @@ def _(ann_model, plt, sns):
 
 @app.cell
 def _(mo):
-    mo.md(r"""# Naive Bayes""")
+    mo.md(
+        r"""
+        # Naive Bayes
+        Thank you, [StackOverflow](https://stackoverflow.com/questions/14254203/mixing-categorial-and-continuous-data-in-naive-bayes-classifier-using-scikit-lea/14255284#14255284)...
+        """
+    )
     return
 
 
