@@ -87,7 +87,6 @@ def _(df, pd):
     ann_df = df.iloc[:, 1::]
     ann_df = pd.get_dummies(data=ann_df, columns=["Year", "Reporting_Airline", "Origin", "OriginState", "Dest", "DestState"])
     dummy_cols = list(ann_df.columns[13::])
-
     def bool2int(b):
         return 1 if b else 0
 
@@ -104,7 +103,6 @@ def _(ann_df, datetime):
 
     ann_df["FlightDate"] = ann_df["FlightDate"].map(to_integer)
     ann_df
-    #print(ann_df)
     return (to_integer,)
 
 
@@ -349,20 +347,19 @@ def _(mo):
 @app.cell
 def _():
     from sklearn.neighbors import KNeighborsClassifier 
-    from sklearn.preprocessing import MinMaxScaler
-    return KNeighborsClassifier, MinMaxScaler
+    from sklearn.preprocessing import MinMaxScaler, FunctionTransformer
+    from sklearn.pipeline import FeatureUnion, make_pipeline
+    return KNeighborsClassifier, MinMaxScaler, FeatureUnion, make_pipeline, FunctionTransformer
+
+
 
 
 @app.cell
-def _(MinMaxScaler, ann_df, pd, target, train_test_split):
-
-    scaler_minmax = MinMaxScaler()
-    # Fit and transform the data
-    attr = ann_df.head(80000)
+def _(MinMaxScaler, df, pd, target, train_test_split, knn_pipeline):
+    
+    attr = df.head(80000)
     target_knn = target.head(80000)
-    print(attr)
-    attr = pd.DataFrame(scaler_minmax.fit_transform(attr), columns=attr.columns)
-    attr.head()
+    #print(attr)
     trainX_knn, testX_knn, trainY_knn, testY_knn = train_test_split(attr, target_knn, random_state=42, test_size=0.2)
     print(trainX_knn.shape)
     print(trainY_knn.shape)
@@ -377,17 +374,42 @@ def _(
     testY_knn,
     trainX_knn,
     trainY_knn,
+    MinMaxScaler,
+    OneHotEncoder,
+    Pipeline,
+    to_integer,
+    make_pipeline,
+    FeatureUnion,
+    FunctionTransformer,
 ):
+    minmax_scaler = MinMaxScaler()
+
+    categorical_cols_knn = ["Reporting_Airline", "Origin", "OriginState", "Dest", "DestState"] # separate categorical and continuous data
+    def numeric(d):
+        numeric_cols = d.drop(columns=categorical_cols_knn)
+        numeric_cols["FlightDate"] = numeric_cols["FlightDate"].map(to_integer)
+        return numeric_cols
+    
+    def categ(d):
+        return d[categorical_cols_knn]
+    
     k_values = [3, 5, 10]
     for k in k_values:
         print(k)
-        knn = KNeighborsClassifier(n_neighbors = k)
-        knn.fit(trainX_knn, trainY_knn)
-        target_pred_KNN = knn.predict(testX_knn)
+        knn_pipeline = Pipeline([
+    ("features", FeatureUnion([
+        ('numeric', make_pipeline(FunctionTransformer(numeric),minmax_scaler)),
+        ('categorical', make_pipeline(FunctionTransformer(categ),OneHotEncoder(sparse_output=False)))
+    ])),
+    ('model', KNeighborsClassifier(n_neighbors= k))
+    ])
+        knn_pipeline.fit(trainX_knn, trainY_knn)
+        target_pred_KNN = knn_pipeline.predict(testX_knn)
         accuracy_KNN = accuracy_score(testY_knn,target_pred_KNN ) 
         print(f'Accuracy of model with k = {k}: {accuracy_KNN}')
         print('')
     return (target_pred_KNN,)
+
 
 
 @app.cell
@@ -424,13 +446,14 @@ def _(pd, test_actual):
     freq_table =pd.crosstab( test_actual['test_actual'], test_actual['target_pred'])
     print("Confusion Matrix")
     print(freq_table)
+    freq_table
     return
 
 
 @app.cell
 def _(cm, plt, sns):
     ax= plt.subplot()
-    sns.heatmap(cm, annot=True, fmt='g', ax=ax); 
+    heatmap = sns.heatmap(cm, annot=True, fmt='g', ax=ax); 
 
     # labels, title and ticks
     ax.set_xlabel('Predicted labels');ax.set_ylabel('True labels'); 
@@ -438,6 +461,7 @@ def _(cm, plt, sns):
     ax.xaxis.set_ticklabels(['Not delayed', 'Delayed'])
     ax.yaxis.set_ticklabels(['Not delayed', 'Delayed'])
     plt.show()
+    heatmap
     return
 
 
