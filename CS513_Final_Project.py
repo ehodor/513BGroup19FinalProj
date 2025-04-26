@@ -299,8 +299,7 @@ def _():
 
 @app.cell
 def _(ann_df, target, train_test_split):
-
-    trainX_CART, testX_CART, trainY_CART, testY_CART = train_test_split(ann_df, target, random_state=42, test_size=0.2)
+    trainX_CART, testX_CART, trainY_CART, testY_CART = train_test_split(ann_df, target, random_state=42,  test_size=0.2)
     print(trainX_CART.shape)
     print(trainY_CART.shape)
     return testX_CART, testY_CART, trainX_CART, trainY_CART
@@ -308,7 +307,7 @@ def _(ann_df, target, train_test_split):
 
 @app.cell
 def _(DecisionTreeClassifier, testX_CART, trainX_CART, trainY_CART):
-    model_CART = DecisionTreeClassifier()
+    model_CART = DecisionTreeClassifier(max_depth=8, max_leaf_nodes=50, max_features='sqrt')
     model_CART.fit(trainX_CART,trainY_CART)
     target_pred_CART = model_CART.predict(testX_CART)
     return model_CART, target_pred_CART
@@ -331,8 +330,8 @@ def _(
 
 @app.cell
 def _(ann_df, model_CART, plot_tree, plt):
-    plt.figure(figsize=(20,10), dpi=100)
-    tree_res = plot_tree(model_CART,fontsize=20,filled=True,feature_names=ann_df.columns);
+    plt.figure(figsize=(20,10), dpi=50)
+    tree_res = plot_tree(model_CART,fontsize=15,filled=True,feature_names=ann_df.columns);
     plt.show()
     tree_res
     return
