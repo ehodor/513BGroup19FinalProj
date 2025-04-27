@@ -111,7 +111,7 @@ def _(StandardScaler, ann_df, pd, target, train_test_split):
     scaler = StandardScaler()
     ann_df_scaled = pd.DataFrame(scaler.fit_transform(ann_df), columns=ann_df.columns)
 
-    trainX, testX, trainY, testY = train_test_split(ann_df_scaled, target, random_state=42, test_size=0.2)
+    trainX, testX, trainY, testY = train_test_split(ann_df_scaled, target, random_state=42, test_size=0.3)
     print(trainX.shape)
     print(trainY.shape)
     return testX, testY, trainX, trainY
@@ -129,7 +129,7 @@ def _(
     trainX,
     trainY,
 ):
-    ann_model = MLPClassifier(hidden_layer_sizes=(trainX.shape[1], ), max_iter=10000)
+    ann_model = MLPClassifier(hidden_layer_sizes=(trainX.shape[1], trainX.shape[1]//2), max_iter=1000, learning_rate='adaptive', early_stopping=True, alpha=0.001)
     ann_model.fit(trainX, trainY)
     ann_preds = ann_model.predict(testX)
 
@@ -191,8 +191,8 @@ def _(
     pd,
     to_integer,
 ):
-    cnb = CategoricalNB()
-    gnb = GaussianNB()
+    cnb = CategoricalNB(alpha=0.001)
+    gnb = GaussianNB(var_smoothing=0.0001)
 
 
     gnb_scaler = MinMaxScaler()
@@ -216,8 +216,8 @@ def _(
 
 @app.cell
 def _(cnb_categorical, cnb_pipeline, gnb, gnb_df, target, train_test_split):
-    cnb_trainX, cnb_testX, cnb_trainY, cnb_testY = train_test_split(cnb_categorical, target, random_state=42, test_size=0.2)
-    gnb_trainX, gnb_testX, gnb_trainY, gnb_testY = train_test_split(gnb_df, target, random_state=42, test_size=0.2)
+    cnb_trainX, cnb_testX, cnb_trainY, cnb_testY = train_test_split(cnb_categorical, target, random_state=42, test_size=0.4)
+    gnb_trainX, gnb_testX, gnb_trainY, gnb_testY = train_test_split(gnb_df, target, random_state=42, test_size=0.4)
 
     cnb_pipeline.fit(X=cnb_trainX, y=cnb_trainY) # cnb for categorical data
     cnb_preds = cnb_pipeline.predict(cnb_testX)
@@ -242,9 +242,9 @@ def _(
     gnb_probabilities = gnb.predict_proba(gnb_df)
 
     new_features = np.hstack((cnb_probabilities, gnb_probabilities)) # concatenate them
-    gnb2 = GaussianNB() # create new Gaussian Model
+    gnb2 = GaussianNB(var_smoothing=0.0001) # create new Gaussian Model
 
-    mixed_trainX, mixed_testX, mixed_trainY, mixed_testY = train_test_split(new_features, target, random_state=42, test_size=0.2)
+    mixed_trainX, mixed_testX, mixed_trainY, mixed_testY = train_test_split(new_features, target, random_state=42, test_size=0.4)
     return gnb2, mixed_testX, mixed_testY, mixed_trainX, mixed_trainY
 
 
@@ -348,14 +348,18 @@ def _():
     from sklearn.neighbors import KNeighborsClassifier 
     from sklearn.preprocessing import MinMaxScaler, FunctionTransformer
     from sklearn.pipeline import FeatureUnion, make_pipeline
-    return KNeighborsClassifier, MinMaxScaler, FeatureUnion, make_pipeline, FunctionTransformer
-
-
+    return (
+        FeatureUnion,
+        FunctionTransformer,
+        KNeighborsClassifier,
+        MinMaxScaler,
+        make_pipeline,
+    )
 
 
 @app.cell
-def _(MinMaxScaler, df, pd, target, train_test_split, knn_pipeline):
-    
+def _(df, target, train_test_split):
+
     attr = df.head(80000)
     target_knn = target.head(80000)
     #print(attr)
@@ -367,19 +371,19 @@ def _(MinMaxScaler, df, pd, target, train_test_split, knn_pipeline):
 
 @app.cell
 def _(
+    FeatureUnion,
+    FunctionTransformer,
     KNeighborsClassifier,
-    accuracy_score,
-    testX_knn,
-    testY_knn,
-    trainX_knn,
-    trainY_knn,
     MinMaxScaler,
     OneHotEncoder,
     Pipeline,
-    to_integer,
+    accuracy_score,
     make_pipeline,
-    FeatureUnion,
-    FunctionTransformer,
+    testX_knn,
+    testY_knn,
+    to_integer,
+    trainX_knn,
+    trainY_knn,
 ):
     minmax_scaler = MinMaxScaler()
 
@@ -388,10 +392,10 @@ def _(
         numeric_cols = d.drop(columns=categorical_cols_knn)
         numeric_cols["FlightDate"] = numeric_cols["FlightDate"].map(to_integer)
         return numeric_cols
-    
+
     def categ(d):
         return d[categorical_cols_knn]
-    
+
     k_values = [3, 5, 10]
     for k in k_values:
         print(k)
@@ -408,7 +412,6 @@ def _(
         print(f'Accuracy of model with k = {k}: {accuracy_KNN}')
         print('')
     return (target_pred_KNN,)
-
 
 
 @app.cell
