@@ -32,7 +32,7 @@ def _(mo):
         ## Division of Labor
         * Dimitri - ANN and Naive Bayes
         * Emma - CART and KNN
-        * Mihir - EDA and Random Forest
+        * Mihir - Logistic Regression and Random Forest
         * Sam - ??? and ???
         """
     )
@@ -55,6 +55,61 @@ def _(pd):
 @app.cell
 def _(mo):
     mo.md(r"""# EDA""")
+    return
+
+
+@app.cell
+def _(df):
+    df.info()
+    return
+
+
+@app.cell
+def _(df):
+    df.dropna(how="any", axis=0, inplace=True)
+    return
+
+
+@app.cell
+def _(df):
+    df.isnull().sum()
+    return
+
+
+@app.cell
+def _(df):
+    df.describe(include="all")
+    return
+
+
+@app.cell
+def _(df, plt):
+    edafig, eda_axes = plt.subplots(4, 5, figsize=(35, 25))
+    for col, eda_axis in zip(df.columns, eda_axes.ravel()):
+        eda_axis.hist(df[col])
+        eda_axis.set_title(f"{col}")
+
+    plt.show()
+    return
+
+
+@app.cell
+def _(datetime, df):
+    def to_integer(dt_time):
+        dt_time = datetime.date.fromisoformat(dt_time)
+        return 10000*dt_time.year + 100*dt_time.month + dt_time.day
+
+    df["FlightDate"] = df["FlightDate"].map(to_integer)
+    df
+    return
+
+
+@app.cell
+def _(df, np, plt, sns):
+    matrix = df.corr(numeric_only=True)
+    plt.tight_layout()
+    plt.figure(figsize=(10, 10))
+    sns.heatmap(matrix, cmap=sns.color_palette("flare", as_cmap=True), annot=True, fmt=".2f", mask=np.triu(np.ones_like(matrix)))
     return
 
 
@@ -96,17 +151,6 @@ def _(df, pd):
 
 
 @app.cell
-def _(ann_df, datetime):
-    def to_integer(dt_time):
-        dt_time = datetime.date.fromisoformat(dt_time)
-        return 10000*dt_time.year + 100*dt_time.month + dt_time.day
-
-    ann_df["FlightDate"] = ann_df["FlightDate"].map(to_integer)
-    ann_df
-    return (to_integer,)
-
-
-@app.cell
 def _(StandardScaler, ann_df, pd, target, train_test_split):
     scaler = StandardScaler()
     ann_df_scaled = pd.DataFrame(scaler.fit_transform(ann_df), columns=ann_df.columns)
@@ -129,7 +173,7 @@ def _(
     trainX,
     trainY,
 ):
-    ann_model = MLPClassifier(hidden_layer_sizes=(trainX.shape[1], trainX.shape[1]//2), max_iter=1000, learning_rate='adaptive', early_stopping=True, alpha=0.001)
+    ann_model = MLPClassifier(hidden_layer_sizes=(trainX.shape[1]*2, trainX.shape[1]//2), max_iter=1000, learning_rate='adaptive', early_stopping=True, alpha=0.001)
     ann_model.fit(trainX, trainY)
     ann_preds = ann_model.predict(testX)
 
@@ -150,6 +194,22 @@ def _(ann_model, plt, sns):
     plt.ylabel('Loss')
     plt.show()
     plotted
+    return
+
+
+@app.cell
+def _(ann_model, plt):
+    # use global min / max to ensure all weights are shown on the same scale
+    fig, axes = plt.subplots(1, 3)
+
+    for coef, ax1 in zip(ann_model.coefs_, axes.ravel()):
+        vmin, vmax = min([min(i) for i in coef]), max([max(i) for i in coef])
+        ax1.matshow(coef, cmap=plt.cm.hsv, vmin=0.5 * vmin, vmax=0.5 * vmax)
+        ax1.set_title(f"{coef.shape}")
+        ax1.set_xticks(())
+        ax1.set_yticks(())
+
+    plt.show()
     return
 
 
@@ -189,7 +249,6 @@ def _(
     Pipeline,
     df,
     pd,
-    to_integer,
 ):
     cnb = CategoricalNB(alpha=0.001)
     gnb = GaussianNB(var_smoothing=0.0001)
@@ -204,7 +263,6 @@ def _(
     ])
 
     gnb_df = df.drop(columns=categorical_cols)
-    gnb_df["FlightDate"] = gnb_df["FlightDate"].map(to_integer)
     gnb_df = pd.DataFrame(gnb_scaler.fit_transform(gnb_df), columns=gnb_df.columns)
 
     cnb_pipeline = Pipeline(steps=[
@@ -381,7 +439,6 @@ def _(
     make_pipeline,
     testX_knn,
     testY_knn,
-    to_integer,
     trainX_knn,
     trainY_knn,
 ):
@@ -390,7 +447,6 @@ def _(
     categorical_cols_knn = ["Reporting_Airline", "Origin", "OriginState", "Dest", "DestState"] # separate categorical and continuous data
     def numeric(d):
         numeric_cols = d.drop(columns=categorical_cols_knn)
-        numeric_cols["FlightDate"] = numeric_cols["FlightDate"].map(to_integer)
         return numeric_cols
 
     def categ(d):
