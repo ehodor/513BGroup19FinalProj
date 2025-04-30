@@ -2,7 +2,7 @@
 
 import marimo
 
-__generated_with = "0.13.1"
+__generated_with = "0.13.2"
 app = marimo.App(width="medium")
 
 
@@ -33,7 +33,7 @@ def _(mo):
         * Dimitri - ANN and Naive Bayes
         * Emma - CART and KNN
         * Mihir - Logistic Regression and Random Forest
-        * Sam - ??? and ???
+        * Sam - Hierarchical Clustering and K-Means Clustering
         """
     )
     return
@@ -47,7 +47,9 @@ def _(mo):
 
 @app.cell
 def _(pd):
-    df = pd.read_csv("./flight_delay_predict.csv")
+    # df = pd.read_csv("./flight_delay_predict.csv")
+    df = pd.read_csv("C:/Users/Crims/Stevens/2025/CS513/Final/513BGroup19FinalProj/flight_delay_predict.csv")
+
     df
     return (df,)
 
@@ -158,7 +160,7 @@ def _(StandardScaler, ann_df, pd, target, train_test_split):
     trainX, testX, trainY, testY = train_test_split(ann_df_scaled, target, random_state=42, test_size=0.3)
     print(trainX.shape)
     print(trainY.shape)
-    return testX, testY, trainX, trainY
+    return scaler, testX, testY, trainX, trainY
 
 
 @app.cell
@@ -540,6 +542,138 @@ def _(cm, plt, sns):
 @app.cell
 def _(mo):
     mo.md(r"""# Random Forest""")
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""# Hierarchal Clustering""")
+    return
+
+
+@app.cell
+def _():
+    from sklearn.decomposition import PCA  
+    from sklearn.preprocessing import normalize 
+    from sklearn.metrics import silhouette_score 
+    import scipy.cluster.hierarchy as shc 
+    from sklearn.cluster import AgglomerativeClustering
+    from sklearn.cluster import KMeans
+    return (
+        AgglomerativeClustering,
+        KMeans,
+        PCA,
+        normalize,
+        shc,
+        silhouette_score,
+    )
+
+
+@app.cell
+def _(PCA, ann_df, normalize, pd, plt, scaler, shc, target):
+    cluster_attr = ann_df.head(10000)
+    target_clust = target.head(10000)
+
+    df_scaled_hclust = scaler.fit_transform(cluster_attr) 
+
+    # Normalizing the data so that the data approximately  
+    # follows a Gaussian distribution 
+    df_normalized_hclust = normalize(df_scaled_hclust) 
+
+    # Converting the numpy array into a pandas DataFrame 
+    df_normalized_hclust = pd.DataFrame(df_normalized_hclust) 
+
+    pca = PCA(n_components = 2) 
+    df_principal_hclust = pca.fit_transform(df_normalized_hclust) 
+    df_principal_hclust = pd.DataFrame(df_principal_hclust) 
+    df_principal_hclust.columns = ['P1', 'P2'] 
+
+
+    plt.figure(figsize =(8, 8)) 
+    plt.title('Visualising the data') 
+    Dendrogram = shc.dendrogram((shc.linkage(df_principal_hclust, method ='ward'))) 
+    plt.show()
+
+    return cluster_attr, df_principal_hclust, target_clust
+
+
+@app.cell
+def _(AgglomerativeClustering, df_principal_hclust, plt, silhouette_score):
+    silhouette_scores = [] 
+
+    for i in range(2, 20):
+        ac = AgglomerativeClustering(n_clusters = i)
+    
+        # Visualizing the clustering 
+        plt.figure(figsize =(6, 6)) 
+        plt.scatter(df_principal_hclust['P1'], df_principal_hclust['P2'],  
+                   c = ac.fit_predict(df_principal_hclust), cmap ='rainbow') 
+        plt.show() 
+
+        silhouette_scores.append( 
+            silhouette_score(df_principal_hclust, ac.fit_predict(df_principal_hclust))) 
+    return (silhouette_scores,)
+
+
+@app.cell
+def _(plt, silhouette_scores):
+    # Plotting a bar graph to compare the results 
+    plt.bar([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], silhouette_scores) 
+
+    plt.xlabel('Number of clusters', fontsize = 20) 
+    plt.ylabel('S(i)', fontsize = 20) 
+
+    plt.show() 
+
+    print(silhouette_scores)
+    return
+
+
+@app.cell
+def _(AgglomerativeClustering, df_principal_hclust, plt):
+    ac5 = AgglomerativeClustering(n_clusters = 5)
+
+    clusters = ac5.fit_predict(df_principal_hclust)
+    
+    # Visualizing the clustering 
+    plt.figure(figsize =(6, 6)) 
+    plt.scatter(df_principal_hclust['P1'], df_principal_hclust['P2'],  
+               c=clusters, cmap ='rainbow') 
+    plt.show() 
+    return (clusters,)
+
+
+@app.cell
+def _(clusters, pd, target_clust):
+    df_cluster=pd.DataFrame({'Actual':target_clust,'Cluster':clusters})
+    # Create a cross-tabulation
+    cross_tab = pd.crosstab(df_cluster['Actual'], df_cluster['Cluster'])
+
+    print(cross_tab)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""# K-Means Clustering""")
+    return
+
+
+@app.cell
+def _(KMeans, cluster_attr, pd, target_clust):
+    kmeans = KMeans(n_clusters=5, random_state=12)
+    kmeans.fit(cluster_attr)
+    labels = kmeans.labels_
+    centers = kmeans.cluster_centers_
+
+    print(labels)
+    print(centers)
+
+    df_kmeans=pd.DataFrame({'Actual':target_clust,'Cluster':labels})
+
+    kmeans_cross_tab = pd.crosstab(df_kmeans['Actual'], df_kmeans['Cluster'])
+
+    print(kmeans_cross_tab)
     return
 
 
