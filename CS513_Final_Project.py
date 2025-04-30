@@ -2,7 +2,7 @@
 
 import marimo
 
-__generated_with = "0.13.1"
+__generated_with = "0.13.2"
 app = marimo.App(width="medium")
 
 
@@ -32,8 +32,8 @@ def _(mo):
         ## Division of Labor
         * Dimitri - ANN and Naive Bayes
         * Emma - CART and KNN
-        * Mihir - EDA and Random Forest
-        * Sam - ??? and ???
+        * Mihir - Logistic Regression and Random Forest
+        * Sam - Hierarchical Clustering and K-Means Clustering
         """
     )
     return
@@ -47,7 +47,9 @@ def _(mo):
 
 @app.cell
 def _(pd):
-    df = pd.read_csv("./flight_delay_predict.csv")
+    # df = pd.read_csv("./flight_delay_predict.csv")
+    df = pd.read_csv("C:/Users/Crims/Stevens/2025/CS513/Final/513BGroup19FinalProj/flight_delay_predict.csv")
+
     df
     return (df,)
 
@@ -55,6 +57,61 @@ def _(pd):
 @app.cell
 def _(mo):
     mo.md(r"""# EDA""")
+    return
+
+
+@app.cell
+def _(df):
+    df.info()
+    return
+
+
+@app.cell
+def _(df):
+    df.dropna(how="any", axis=0, inplace=True)
+    return
+
+
+@app.cell
+def _(df):
+    df.isnull().sum()
+    return
+
+
+@app.cell
+def _(df):
+    df.describe(include="all")
+    return
+
+
+@app.cell
+def _(df, plt):
+    edafig, eda_axes = plt.subplots(4, 5, figsize=(35, 25))
+    for col, eda_axis in zip(df.columns, eda_axes.ravel()):
+        eda_axis.hist(df[col])
+        eda_axis.set_title(f"{col}")
+
+    plt.show()
+    return
+
+
+@app.cell
+def _(datetime, df):
+    def to_integer(dt_time):
+        dt_time = datetime.date.fromisoformat(dt_time)
+        return 10000*dt_time.year + 100*dt_time.month + dt_time.day
+
+    df["FlightDate"] = df["FlightDate"].map(to_integer)
+    df
+    return
+
+
+@app.cell
+def _(df, np, plt, sns):
+    matrix = df.corr(numeric_only=True)
+    plt.tight_layout()
+    plt.figure(figsize=(10, 10))
+    sns.heatmap(matrix, cmap=sns.color_palette("flare", as_cmap=True), annot=True, fmt=".2f", mask=np.triu(np.ones_like(matrix)))
     return
 
 
@@ -96,17 +153,6 @@ def _(df, pd):
 
 
 @app.cell
-def _(ann_df, datetime):
-    def to_integer(dt_time):
-        dt_time = datetime.date.fromisoformat(dt_time)
-        return 10000*dt_time.year + 100*dt_time.month + dt_time.day
-
-    ann_df["FlightDate"] = ann_df["FlightDate"].map(to_integer)
-    ann_df
-    return (to_integer,)
-
-
-@app.cell
 def _(StandardScaler, ann_df, pd, target, train_test_split):
     scaler = StandardScaler()
     ann_df_scaled = pd.DataFrame(scaler.fit_transform(ann_df), columns=ann_df.columns)
@@ -114,7 +160,7 @@ def _(StandardScaler, ann_df, pd, target, train_test_split):
     trainX, testX, trainY, testY = train_test_split(ann_df_scaled, target, random_state=42, test_size=0.3)
     print(trainX.shape)
     print(trainY.shape)
-    return testX, testY, trainX, trainY
+    return scaler, testX, testY, trainX, trainY
 
 
 @app.cell
@@ -129,7 +175,7 @@ def _(
     trainX,
     trainY,
 ):
-    ann_model = MLPClassifier(hidden_layer_sizes=(trainX.shape[1], trainX.shape[1]//2), max_iter=1000, learning_rate='adaptive', early_stopping=True, alpha=0.001)
+    ann_model = MLPClassifier(hidden_layer_sizes=(trainX.shape[1]*2, trainX.shape[1]//2), max_iter=1000, learning_rate='adaptive', early_stopping=True, alpha=0.001)
     ann_model.fit(trainX, trainY)
     ann_preds = ann_model.predict(testX)
 
@@ -150,6 +196,22 @@ def _(ann_model, plt, sns):
     plt.ylabel('Loss')
     plt.show()
     plotted
+    return
+
+
+@app.cell
+def _(ann_model, plt):
+    # use global min / max to ensure all weights are shown on the same scale
+    fig, axes = plt.subplots(1, 3)
+
+    for coef, ax1 in zip(ann_model.coefs_, axes.ravel()):
+        vmin, vmax = min([min(i) for i in coef]), max([max(i) for i in coef])
+        ax1.matshow(coef, cmap=plt.cm.hsv, vmin=0.5 * vmin, vmax=0.5 * vmax)
+        ax1.set_title(f"{coef.shape}")
+        ax1.set_xticks(())
+        ax1.set_yticks(())
+
+    plt.show()
     return
 
 
@@ -189,7 +251,6 @@ def _(
     Pipeline,
     df,
     pd,
-    to_integer,
 ):
     cnb = CategoricalNB(alpha=0.001)
     gnb = GaussianNB(var_smoothing=0.0001)
@@ -204,7 +265,6 @@ def _(
     ])
 
     gnb_df = df.drop(columns=categorical_cols)
-    gnb_df["FlightDate"] = gnb_df["FlightDate"].map(to_integer)
     gnb_df = pd.DataFrame(gnb_scaler.fit_transform(gnb_df), columns=gnb_df.columns)
 
     cnb_pipeline = Pipeline(steps=[
@@ -302,12 +362,13 @@ def _(ann_df, target, train_test_split):
     trainX_CART, testX_CART, trainY_CART, testY_CART = train_test_split(ann_df, target, random_state=42,  test_size=0.2)
     print(trainX_CART.shape)
     print(trainY_CART.shape)
+    trainX_CART, trainY_CART
     return testX_CART, testY_CART, trainX_CART, trainY_CART
 
 
 @app.cell
 def _(DecisionTreeClassifier, testX_CART, trainX_CART, trainY_CART):
-    model_CART = DecisionTreeClassifier(max_depth=8, max_leaf_nodes=50, max_features='sqrt')
+    model_CART = DecisionTreeClassifier(max_depth=7, max_leaf_nodes=50, max_features='sqrt')
     model_CART.fit(trainX_CART,trainY_CART)
     target_pred_CART = model_CART.predict(testX_CART)
     return model_CART, target_pred_CART
@@ -322,10 +383,20 @@ def _(
     testY_CART,
 ):
     print(confusion_matrix(testY_CART,target_pred_CART))
-    mo.md(f"{confusion_matrix(testY_CART,target_pred_CART)}")
+    #mo.md(f"""Confusion matrix:""")
     print(classification_report(testY_CART,target_pred_CART))
-    mo.md(f"{classification_report(testY_CART,target_pred_CART)}")
+    #mo.md(f"""Classification report: """)
+    confusion_matrix(testY_CART,target_pred_CART)
     return
+
+@app.cell
+def _(classification_report,
+      target_pred_CART,
+    testY_CART,
+      ):
+     classification_report(testY_CART,target_pred_CART)
+     return
+    
 
 
 @app.cell
@@ -366,6 +437,7 @@ def _(df, target, train_test_split):
     trainX_knn, testX_knn, trainY_knn, testY_knn = train_test_split(attr, target_knn, random_state=42, test_size=0.2)
     print(trainX_knn.shape)
     print(trainY_knn.shape)
+    trainX_knn, trainY_knn
     return testX_knn, testY_knn, trainX_knn, trainY_knn
 
 
@@ -381,7 +453,6 @@ def _(
     make_pipeline,
     testX_knn,
     testY_knn,
-    to_integer,
     trainX_knn,
     trainY_knn,
 ):
@@ -390,7 +461,6 @@ def _(
     categorical_cols_knn = ["Reporting_Airline", "Origin", "OriginState", "Dest", "DestState"] # separate categorical and continuous data
     def numeric(d):
         numeric_cols = d.drop(columns=categorical_cols_knn)
-        numeric_cols["FlightDate"] = numeric_cols["FlightDate"].map(to_integer)
         return numeric_cols
 
     def categ(d):
@@ -409,7 +479,7 @@ def _(
         knn_pipeline.fit(trainX_knn, trainY_knn)
         target_pred_KNN = knn_pipeline.predict(testX_knn)
         accuracy_KNN = accuracy_score(testY_knn,target_pred_KNN ) 
-        print(f'Accuracy of model with k = {k}: {accuracy_KNN}')
+        print(f"Accuracy of model with k = {k}: {accuracy_KNN}")
         print('')
     return (target_pred_KNN,)
 
@@ -431,6 +501,7 @@ def _(
     print()
     print('Classification Report')
     print(classification_report(testY_knn, target_pred_KNN))
+    confusion_matrix(testY_knn, target_pred_KNN), accuracy_score(testY_knn, target_pred_KNN), classification_report(testY_knn, target_pred_KNN)
     return (cm,)
 
 
@@ -440,6 +511,7 @@ def _(target_pred_KNN, testX_knn, testY_knn):
     test_actual['target_pred']=target_pred_KNN
     test_actual['test_actual']=testY_knn
     test_actual.head(10)
+    test_actual
     return (test_actual,)
 
 
@@ -588,6 +660,138 @@ def _(rf_pipeline, rf_df, cat_features, num_features, OneHotEncoder, pd, plt, sn
     rf_importance_plot
     return (fi_df)
  
+
+@app.cell
+def _(mo):
+    mo.md(r"""# Hierarchal Clustering""")
+    return
+
+
+@app.cell
+def _():
+    from sklearn.decomposition import PCA  
+    from sklearn.preprocessing import normalize 
+    from sklearn.metrics import silhouette_score 
+    import scipy.cluster.hierarchy as shc 
+    from sklearn.cluster import AgglomerativeClustering
+    from sklearn.cluster import KMeans
+    return (
+        AgglomerativeClustering,
+        KMeans,
+        PCA,
+        normalize,
+        shc,
+        silhouette_score,
+    )
+
+
+@app.cell
+def _(PCA, ann_df, normalize, pd, plt, scaler, shc, target):
+    cluster_attr = ann_df.head(10000)
+    target_clust = target.head(10000)
+
+    df_scaled_hclust = scaler.fit_transform(cluster_attr) 
+
+    # Normalizing the data so that the data approximately  
+    # follows a Gaussian distribution 
+    df_normalized_hclust = normalize(df_scaled_hclust) 
+
+    # Converting the numpy array into a pandas DataFrame 
+    df_normalized_hclust = pd.DataFrame(df_normalized_hclust) 
+
+    pca = PCA(n_components = 2) 
+    df_principal_hclust = pca.fit_transform(df_normalized_hclust) 
+    df_principal_hclust = pd.DataFrame(df_principal_hclust) 
+    df_principal_hclust.columns = ['P1', 'P2'] 
+
+
+    plt.figure(figsize =(8, 8)) 
+    plt.title('Visualising the data') 
+    Dendrogram = shc.dendrogram((shc.linkage(df_principal_hclust, method ='ward'))) 
+    plt.show()
+
+    return cluster_attr, df_principal_hclust, target_clust
+
+
+@app.cell
+def _(AgglomerativeClustering, df_principal_hclust, plt, silhouette_score):
+    silhouette_scores = [] 
+
+    for i in range(2, 20):
+        ac = AgglomerativeClustering(n_clusters = i)
+    
+        # Visualizing the clustering 
+        plt.figure(figsize =(6, 6)) 
+        plt.scatter(df_principal_hclust['P1'], df_principal_hclust['P2'],  
+                   c = ac.fit_predict(df_principal_hclust), cmap ='rainbow') 
+        plt.show() 
+
+        silhouette_scores.append( 
+            silhouette_score(df_principal_hclust, ac.fit_predict(df_principal_hclust))) 
+    return (silhouette_scores,)
+
+
+@app.cell
+def _(plt, silhouette_scores):
+    # Plotting a bar graph to compare the results 
+    plt.bar([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], silhouette_scores) 
+
+    plt.xlabel('Number of clusters', fontsize = 20) 
+    plt.ylabel('S(i)', fontsize = 20) 
+
+    plt.show() 
+
+    print(silhouette_scores)
+    return
+
+
+@app.cell
+def _(AgglomerativeClustering, df_principal_hclust, plt):
+    ac5 = AgglomerativeClustering(n_clusters = 5)
+
+    clusters = ac5.fit_predict(df_principal_hclust)
+    
+    # Visualizing the clustering 
+    plt.figure(figsize =(6, 6)) 
+    plt.scatter(df_principal_hclust['P1'], df_principal_hclust['P2'],  
+               c=clusters, cmap ='rainbow') 
+    plt.show() 
+    return (clusters,)
+
+
+@app.cell
+def _(clusters, pd, target_clust):
+    df_cluster=pd.DataFrame({'Actual':target_clust,'Cluster':clusters})
+    # Create a cross-tabulation
+    cross_tab = pd.crosstab(df_cluster['Actual'], df_cluster['Cluster'])
+
+    print(cross_tab)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""# K-Means Clustering""")
+    return
+
+
+@app.cell
+def _(KMeans, cluster_attr, pd, target_clust):
+    kmeans = KMeans(n_clusters=5, random_state=12)
+    kmeans.fit(cluster_attr)
+    labels = kmeans.labels_
+    centers = kmeans.cluster_centers_
+
+    print(labels)
+    print(centers)
+
+    df_kmeans=pd.DataFrame({'Actual':target_clust,'Cluster':labels})
+
+    kmeans_cross_tab = pd.crosstab(df_kmeans['Actual'], df_kmeans['Cluster'])
+
+    print(kmeans_cross_tab)
+    return
+
 
 if __name__ == "__main__":
     app.run()
