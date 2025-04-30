@@ -472,6 +472,122 @@ def _(mo):
     mo.md(r"""# Random Forest""")
     return
 
+@app.cell
+def _():
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn import set_config
+    return (RandomForestClassifier, set_config)
+
+@app.cell
+def _(df):
+    rf_target = df['is_delay']
+    rf_df = df.iloc[:, 1::]
+    return rf_df, rf_target
+
+@app.cell
+def _(rf_df, to_integer, RandomForestClassifier, ColumnTransformer, FunctionTransformer, OneHotEncoder, Pipeline, set_config):
+    # Preprocess the data
+
+    def preprocess_dates(X):
+        X = X.copy()
+        X.iloc[:, 0] = X.iloc[:, 0].map(to_integer)
+        return X
+
+    cat_features = ['Reporting_Airline', 'Origin', 'OriginState', 'Dest', 'DestState']
+    num_features = [col for col in rf_df.columns if col not in cat_features + ['FlightDate']]
+
+    rf_preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', 'passthrough', num_features),
+            ('date', FunctionTransformer(preprocess_dates), ['FlightDate']),
+            ('cat', OneHotEncoder(handle_unknown='ignore'), cat_features)
+        ])
+
+    rf_pipeline = Pipeline([
+        ('preprocessor', rf_preprocessor),
+        ('classifier', RandomForestClassifier(
+            n_estimators=100,
+            max_depth=10,
+            random_state=77,
+            class_weight='balanced',
+        ))
+    ])
+    return (cat_features, num_features, rf_pipeline)
+
+@app.cell
+def _(rf_df, target, train_test_split, rf_pipeline):
+
+    rf_Xtrain, rf_Xtest, rf_ytrain, rf_ytest = train_test_split(rf_df, target, test_size=0.2, random_state=77)
+   
+    print(rf_Xtrain.shape)
+    print(rf_ytrain.shape)
+    
+    rf_pipeline.fit(rf_Xtrain, rf_ytrain)
+    return (rf_Xtrain, rf_Xtest, rf_ytrain, rf_ytest)
+
+@app.cell
+def _(rf_pipeline, rf_Xtest, rf_ytest, accuracy_score, confusion_matrix, classification_report, plt, sns):
+    rf_y_pred = rf_pipeline.predict(rf_Xtest)
+
+    rf_accuracy = accuracy_score(rf_ytest, rf_y_pred)
+    rf_cm = confusion_matrix(rf_ytest, rf_y_pred)
+    rf_cr = classification_report(rf_ytest, rf_y_pred)
+
+    print(f"Random Forest Accuracy: {rf_accuracy:.2%}")
+    print("Confusion Matrix:")
+    print(rf_cm)
+    print("Classification Report:")
+    print(rf_cr)
+
+    labels = ['No Delay', 'Delay']
+
+    # Plot
+    plt.figure(figsize=(6, 5))
+    rf_hm = sns.heatmap(rf_cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title('Confusion Matrix')
+    plt.show()
+    rf_hm
+
+    return (rf_hm)#(rf_y_pred,)
+
+@app.cell
+def _(rf_pipeline, rf_df, cat_features, num_features, OneHotEncoder, pd, plt, sns):
+    # Extract the trained RandomForest model
+    rf_model = rf_pipeline.named_steps["classifier"]
+    
+    # Get feature names from the preprocessor
+    pp = rf_pipeline.named_steps["preprocessor"]
+    
+    # Get names for numeric and date features
+    numeric_names = num_features + ['FlightDate']
+    
+    # Get one-hot encoded column names from the fitted encoder
+    ohe = pp.named_transformers_["cat"]
+    ohe_feature_names = ohe.get_feature_names_out(cat_features)
+    
+    # Combine all feature names in the order used by the model
+    feature_names = numeric_names + list(ohe_feature_names)
+    
+    # Get importances
+    importances = rf_model.feature_importances_
+    
+    # Create DataFrame for plotting
+    fi_df = pd.DataFrame({
+        "Feature": feature_names,
+        "Importance": importances
+    }).sort_values(by="Importance", ascending=False).head(20)
+
+    # Plot
+    plt.figure(figsize=(10, 6))
+    rf_importance_plot = sns.barplot(data=fi_df, x="Importance", y="Feature")
+    plt.tight_layout()
+    plt.show()
+
+    rf_importance_plot
+    return (fi_df)
+ 
 
 if __name__ == "__main__":
     app.run()
