@@ -360,12 +360,13 @@ def _(ann_df, target, train_test_split):
     trainX_CART, testX_CART, trainY_CART, testY_CART = train_test_split(ann_df, target, random_state=42,  test_size=0.2)
     print(trainX_CART.shape)
     print(trainY_CART.shape)
+    trainX_CART, trainY_CART
     return testX_CART, testY_CART, trainX_CART, trainY_CART
 
 
 @app.cell
 def _(DecisionTreeClassifier, testX_CART, trainX_CART, trainY_CART):
-    model_CART = DecisionTreeClassifier(max_depth=8, max_leaf_nodes=50, max_features='sqrt')
+    model_CART = DecisionTreeClassifier(max_depth=7, max_leaf_nodes=50, max_features='sqrt')
     model_CART.fit(trainX_CART,trainY_CART)
     target_pred_CART = model_CART.predict(testX_CART)
     return model_CART, target_pred_CART
@@ -380,10 +381,20 @@ def _(
     testY_CART,
 ):
     print(confusion_matrix(testY_CART,target_pred_CART))
-    mo.md(f"{confusion_matrix(testY_CART,target_pred_CART)}")
+    #mo.md(f"""Confusion matrix:""")
     print(classification_report(testY_CART,target_pred_CART))
-    mo.md(f"{classification_report(testY_CART,target_pred_CART)}")
+    #mo.md(f"""Classification report: """)
+    confusion_matrix(testY_CART,target_pred_CART)
     return
+
+@app.cell
+def _(classification_report,
+      target_pred_CART,
+    testY_CART,
+      ):
+     classification_report(testY_CART,target_pred_CART)
+     return
+    
 
 
 @app.cell
@@ -424,6 +435,7 @@ def _(df, target, train_test_split):
     trainX_knn, testX_knn, trainY_knn, testY_knn = train_test_split(attr, target_knn, random_state=42, test_size=0.2)
     print(trainX_knn.shape)
     print(trainY_knn.shape)
+    trainX_knn, trainY_knn
     return testX_knn, testY_knn, trainX_knn, trainY_knn
 
 
@@ -465,7 +477,7 @@ def _(
         knn_pipeline.fit(trainX_knn, trainY_knn)
         target_pred_KNN = knn_pipeline.predict(testX_knn)
         accuracy_KNN = accuracy_score(testY_knn,target_pred_KNN ) 
-        print(f'Accuracy of model with k = {k}: {accuracy_KNN}')
+        print(f"Accuracy of model with k = {k}: {accuracy_KNN}")
         print('')
     return (target_pred_KNN,)
 
@@ -487,6 +499,7 @@ def _(
     print()
     print('Classification Report')
     print(classification_report(testY_knn, target_pred_KNN))
+    confusion_matrix(testY_knn, target_pred_KNN), accuracy_score(testY_knn, target_pred_KNN), classification_report(testY_knn, target_pred_KNN)
     return (cm,)
 
 
@@ -496,6 +509,7 @@ def _(target_pred_KNN, testX_knn, testY_knn):
     test_actual['target_pred']=target_pred_KNN
     test_actual['test_actual']=testY_knn
     test_actual.head(10)
+    test_actual
     return (test_actual,)
 
 
