@@ -47,9 +47,7 @@ def _(mo):
 
 @app.cell
 def _(pd):
-    # df = pd.read_csv("./flight_delay_predict.csv")
-    df = pd.read_csv("C:/Users/Crims/Stevens/2025/CS513/Final/513BGroup19FinalProj/flight_delay_predict.csv")
-
+    df = pd.read_csv("./flight_delay_predict.csv")
     df
     return (df,)
 
@@ -98,12 +96,14 @@ def _(df, plt):
 @app.cell
 def _(datetime, df):
     def to_integer(dt_time):
+        if not isinstance(dt_time, str):
+            dt_time = str(dt_time)
         dt_time = datetime.date.fromisoformat(dt_time)
         return 10000*dt_time.year + 100*dt_time.month + dt_time.day
-
+    
     df["FlightDate"] = df["FlightDate"].map(to_integer)
     df
-    return
+    return to_integer
 
 
 @app.cell
@@ -611,11 +611,11 @@ def _(rf_pipeline, rf_Xtest, rf_ytest, accuracy_score, confusion_matrix, classif
     print("Classification Report:")
     print(rf_cr)
 
-    labels = ['No Delay', 'Delay']
+    rf_labels = ['No Delay', 'Delay']
 
     # Plot
     plt.figure(figsize=(6, 5))
-    rf_hm = sns.heatmap(rf_cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
+    rf_hm = sns.heatmap(rf_cm, annot=True, fmt='d', cmap='Blues', xticklabels=rf_labels, yticklabels=rf_labels)
     plt.xlabel('Predicted')
     plt.ylabel('Actual')
     plt.title('Confusion Matrix')
@@ -636,7 +636,7 @@ def _(rf_pipeline, rf_df, cat_features, num_features, OneHotEncoder, pd, plt, sn
     numeric_names = num_features + ['FlightDate']
     
     # Get one-hot encoded column names from the fitted encoder
-    ohe = pp.named_transformers_["cat"]
+    ohe = rf_pipeline.named_steps.preprocessor.named_transformers_["cat"]
     ohe_feature_names = ohe.get_feature_names_out(cat_features)
     
     # Combine all feature names in the order used by the model
@@ -645,7 +645,6 @@ def _(rf_pipeline, rf_df, cat_features, num_features, OneHotEncoder, pd, plt, sn
     # Get importances
     importances = rf_model.feature_importances_
     
-    # Create DataFrame for plotting
     fi_df = pd.DataFrame({
         "Feature": feature_names,
         "Importance": importances
@@ -660,6 +659,64 @@ def _(rf_pipeline, rf_df, cat_features, num_features, OneHotEncoder, pd, plt, sn
     rf_importance_plot
     return (fi_df)
  
+@app.cell
+def _(mo):
+    mo.md(r"""# Logistic Regression""")
+    return
+
+@app.cell
+def _():
+    from sklearn.linear_model import LogisticRegression
+    return (
+        LogisticRegression,
+    )
+
+@app.cell
+def _(ann_df, target, train_test_split):
+    log_trainX, log_testX, log_trainY, log_testY = train_test_split(ann_df, target, test_size=0.3, random_state=42)
+    print(log_trainX.shape, log_testX.shape)
+    return log_trainX, log_testX, log_trainY, log_testY
+
+@app.cell
+def _(LogisticRegression, log_trainX, log_trainY):
+    log_model = LogisticRegression(
+                    max_iter=1000, 
+                    solver='liblinear', 
+                    class_weight='balanced', 
+                    random_state=42)
+    log_model.fit(log_trainX, log_trainY)
+    return log_model
+
+@app.cell
+def _(log_model, log_testX, log_testY, accuracy_score, precision_score, recall_score, f1_score):
+    log_preds = log_model.predict(log_testX)
+    log_accuracy = accuracy_score(log_testY, log_preds)
+    log_precision = precision_score(log_testY, log_preds)
+    log_recall = recall_score(log_testY, log_preds)
+    log_f1 = f1_score(log_testY, log_preds)
+
+    print(f"Accuracy: {log_accuracy:.2%}\nPrecision: {log_precision:.2%}\nRecall: {log_recall:.2%}\nF1 Score: {log_f1:.2%}")
+    return log_preds
+
+@app.cell
+def _(confusion_matrix, log_testY, log_preds, plt, sns):
+    cm_log = confusion_matrix(log_testY, log_preds)
+    print("Confusion Matrix:")
+    print(cm_log)
+
+    log_labels = ['No Delay', 'Delay']
+
+    # Plot
+    plt.figure(figsize=(6, 5))
+    log_hm = sns.heatmap(cm_log, annot=True, fmt='d', cmap='Blues', xticklabels=log_labels, yticklabels=log_labels)
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title('Confusion Matrix')
+    # plt.show()
+
+    return (cm_log, log_hm)
+
+
 
 @app.cell
 def _(mo):
