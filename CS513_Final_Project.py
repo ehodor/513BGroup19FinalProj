@@ -2,7 +2,7 @@
 
 import marimo
 
-__generated_with = "0.13.2"
+__generated_with = "0.13.3"
 app = marimo.App(width="medium")
 
 
@@ -160,7 +160,7 @@ def _(StandardScaler, ann_df, pd, target, train_test_split):
     trainX, testX, trainY, testY = train_test_split(ann_df_scaled, target, random_state=42, test_size=0.3)
     print(trainX.shape)
     print(trainY.shape)
-    return scaler, testX, testY, trainX, trainY
+    return testX, testY, trainX, trainY
 
 
 @app.cell
@@ -375,13 +375,7 @@ def _(DecisionTreeClassifier, testX_CART, trainX_CART, trainY_CART):
 
 
 @app.cell
-def _(
-    classification_report,
-    confusion_matrix,
-    mo,
-    target_pred_CART,
-    testY_CART,
-):
+def _(classification_report, confusion_matrix, target_pred_CART, testY_CART):
     print(confusion_matrix(testY_CART,target_pred_CART))
     #mo.md(f"""Confusion matrix:""")
     print(classification_report(testY_CART,target_pred_CART))
@@ -389,14 +383,11 @@ def _(
     confusion_matrix(testY_CART,target_pred_CART)
     return
 
+
 @app.cell
-def _(classification_report,
-      target_pred_CART,
-    testY_CART,
-      ):
-     classification_report(testY_CART,target_pred_CART)
-     return
-    
+def _(classification_report, target_pred_CART, testY_CART):
+    classification_report(testY_CART,target_pred_CART)
+    return
 
 
 @app.cell
@@ -481,7 +472,7 @@ def _(
         accuracy_KNN = accuracy_score(testY_knn,target_pred_KNN ) 
         print(f"Accuracy of model with k = {k}: {accuracy_KNN}")
         print('')
-    return (target_pred_KNN,)
+    return minmax_scaler, target_pred_KNN
 
 
 @app.cell
@@ -732,66 +723,115 @@ def _():
     import scipy.cluster.hierarchy as shc 
     from sklearn.cluster import AgglomerativeClustering
     from sklearn.cluster import KMeans
+    from scipy.cluster.hierarchy import cophenet
+    from scipy.spatial.distance import pdist
     return (
         AgglomerativeClustering,
         KMeans,
         PCA,
-        normalize,
+        cophenet,
+        pdist,
         shc,
         silhouette_score,
     )
 
 
 @app.cell
-def _(PCA, ann_df, normalize, pd, plt, scaler, shc, target):
-    cluster_attr = ann_df.head(10000)
-    target_clust = target.head(10000)
+def _(ann_df, minmax_scaler, target):
+    cluster_attr = ann_df.head(30000)
+    target_clust = target.head(30000)
 
-    df_scaled_hclust = scaler.fit_transform(cluster_attr) 
+    df_scaled_hclust = minmax_scaler.fit_transform(cluster_attr) 
 
-    # Normalizing the data so that the data approximately  
-    # follows a Gaussian distribution 
-    df_normalized_hclust = normalize(df_scaled_hclust) 
-
-    # Converting the numpy array into a pandas DataFrame 
-    df_normalized_hclust = pd.DataFrame(df_normalized_hclust) 
-
-    pca = PCA(n_components = 2) 
-    df_principal_hclust = pca.fit_transform(df_normalized_hclust) 
-    df_principal_hclust = pd.DataFrame(df_principal_hclust) 
-    df_principal_hclust.columns = ['P1', 'P2'] 
-
-
-    plt.figure(figsize =(8, 8)) 
-    plt.title('Visualising the data') 
-    Dendrogram = shc.dendrogram((shc.linkage(df_principal_hclust, method ='ward'))) 
-    plt.show()
-
-    return cluster_attr, df_principal_hclust, target_clust
+    return df_scaled_hclust, target_clust
 
 
 @app.cell
-def _(AgglomerativeClustering, df_principal_hclust, plt, silhouette_score):
+def _(cophenet, df_scaled_hclust, pdist, shc):
+    link_types = ['ward', 'complete', 'average', 'single']
+
+    linkage_arr = []
+
+    for link in link_types:
+        linked = shc.linkage(df_scaled_hclust, method=link)
+    
+        coph, coph_dists = cophenet(linked, pdist(df_scaled_hclust))
+
+        print(coph)
+
+        linkage_arr.append(linked)
+    return (linkage_arr,)
+
+
+@app.cell
+def _(linkage_arr, plt, shc):
+    plt.figure(figsize=(20, 20))
+    # average = 2
+    Dendrogram = shc.dendrogram(linkage_arr[2], distance_sort='descending', show_leaf_counts=True) 
+
+    plt.title('Dendrogram')
+    plt.xlabel('Samples')
+    plt.ylabel('Euclidean distances')
+
+    plt.show()
+    return
+
+
+@app.cell
+def _(AgglomerativeClustering, np):
+    def wss_calculation(K, data):
+        WSS = []
+        for i in range(K):
+            cluster = AgglomerativeClustering(n_clusters= i+1, metric='euclidean', linkage='average')
+            cluster.fit_predict(data)
+            # cluster index
+            label = cluster.labels_
+            wss = []
+            for j in range(i+1):
+                # extract each cluster according to its index
+                idx = [t for t, e in enumerate(label) if e == j]
+                cluster = data[idx,]
+                # calculate the WSS:
+                cluster_mean = cluster.mean(axis=0)
+                distance = np.sum(np.abs(cluster - cluster_mean)**2,axis=-1)
+                wss.append(sum(distance))
+            WSS.append(sum(wss))
+        return WSS
+    return (wss_calculation,)
+
+
+@app.cell
+def _(df_scaled_hclust, wss_calculation):
+    WSS=wss_calculation(20, df_scaled_hclust)
+    return (WSS,)
+
+
+@app.cell
+def _(WSS, plt):
+    plt.figure(figsize=(10,5))
+    plt.title('Optimal number of cluster')
+    plt.xlabel('Number of cluster (k)')
+    plt.ylabel('Total intra-cluster variation')
+    plt.plot(range(2, 22), WSS, marker = "o", linestyle='--')
+    return
+
+
+@app.cell
+def _(AgglomerativeClustering, df_scaled_hclust, silhouette_score):
     silhouette_scores = [] 
 
-    for i in range(2, 20):
-        ac = AgglomerativeClustering(n_clusters = i)
-    
-        # Visualizing the clustering 
-        plt.figure(figsize =(6, 6)) 
-        plt.scatter(df_principal_hclust['P1'], df_principal_hclust['P2'],  
-                   c = ac.fit_predict(df_principal_hclust), cmap ='rainbow') 
-        plt.show() 
+    for i in range(2, 21):
+        ac = AgglomerativeClustering(n_clusters = i, metric='euclidean', linkage='average')
 
         silhouette_scores.append( 
-            silhouette_score(df_principal_hclust, ac.fit_predict(df_principal_hclust))) 
+            silhouette_score(df_scaled_hclust, ac.fit_predict(df_scaled_hclust))) 
     return (silhouette_scores,)
 
 
 @app.cell
 def _(plt, silhouette_scores):
     # Plotting a bar graph to compare the results 
-    plt.bar([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], silhouette_scores) 
+    plt.bar([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], silhouette_scores) 
 
     plt.xlabel('Number of clusters', fontsize = 20) 
     plt.ylabel('S(i)', fontsize = 20) 
@@ -803,21 +843,13 @@ def _(plt, silhouette_scores):
 
 
 @app.cell
-def _(AgglomerativeClustering, df_principal_hclust, plt):
-    ac5 = AgglomerativeClustering(n_clusters = 5)
+def _(AgglomerativeClustering, df_scaled_hclust, pd, target_clust):
+    ac12 = AgglomerativeClustering(n_clusters=12, metric='euclidean', linkage='average')
 
-    clusters = ac5.fit_predict(df_principal_hclust)
-    
-    # Visualizing the clustering 
-    plt.figure(figsize =(6, 6)) 
-    plt.scatter(df_principal_hclust['P1'], df_principal_hclust['P2'],  
-               c=clusters, cmap ='rainbow') 
-    plt.show() 
-    return (clusters,)
+    clusters = ac12.fit_predict(df_scaled_hclust)
 
+    print(clusters)
 
-@app.cell
-def _(clusters, pd, target_clust):
     df_cluster=pd.DataFrame({'Actual':target_clust,'Cluster':clusters})
     # Create a cross-tabulation
     cross_tab = pd.crosstab(df_cluster['Actual'], df_cluster['Cluster'])
@@ -833,15 +865,83 @@ def _(mo):
 
 
 @app.cell
-def _(KMeans, cluster_attr, pd, target_clust):
-    kmeans = KMeans(n_clusters=5, random_state=12)
-    kmeans.fit(cluster_attr)
+def _(ann_df, minmax_scaler):
+    df_scaled_kmeans = minmax_scaler.fit_transform(ann_df) 
+    return
+
+
+@app.cell
+def _(PCA, df_scaled_hclust):
+    pca = PCA()
+    pca.fit(df_scaled_hclust)
+    return (pca,)
+
+
+@app.cell
+def _(pca):
+    pca.explained_variance_ratio_
+    return
+
+
+@app.cell
+def _(pca, plt):
+    plt.figure(figsize=(10, 8))
+    plt.plot(range(1, 56), pca.explained_variance_ratio_.cumsum(), marker='o', linestyle='--')
+    plt.title('Explained Variance by Components')
+    plt.xlabel('Number of Components')
+    plt.ylabel('Cumulative Explained Variance')
+    return
+
+
+@app.cell
+def _(PCA, df_scaled_hclust):
+    # reduce components to the 80% variance
+    n_pca = PCA(n_components=13)
+    n_pca.fit(df_scaled_hclust)
+
+    print(n_pca.transform(df_scaled_hclust))
+
+    scores_pca = n_pca.transform(df_scaled_hclust)
+    return (scores_pca,)
+
+
+@app.cell
+def _(KMeans, scores_pca):
+    wcss = []
+    for c in range(1, 21):
+        kmeans_pca = KMeans(n_clusters=c, random_state=20)
+        kmeans_pca.fit(scores_pca)
+        wcss.append(kmeans_pca.inertia_)
+    return (wcss,)
+
+
+@app.cell
+def _(plt, wcss):
+    plt.figure(figsize=(10, 8))
+    plt.plot(range(1,21), wcss, marker = 'o', linestyle='--')
+    plt.xlabel('Number of Clusters')
+    plt.ylabel('WCSS')
+    plt.title('K-means with PCA Clustering')
+    plt.show()
+    return
+
+
+@app.cell
+def _(KMeans, df_scaled_hclust):
+    # graph smoothes out after 11 clusters
+
+    kmeans = KMeans(n_clusters=11, random_state=20)
+    kmeans.fit(df_scaled_hclust)
     labels = kmeans.labels_
     centers = kmeans.cluster_centers_
 
     print(labels)
     print(centers)
+    return (labels,)
 
+
+@app.cell
+def _(labels, pd, target_clust):
     df_kmeans=pd.DataFrame({'Actual':target_clust,'Cluster':labels})
 
     kmeans_cross_tab = pd.crosstab(df_kmeans['Actual'], df_kmeans['Cluster'])
